@@ -1,3 +1,4 @@
+import { FuzzyTriangleGate } from './fuzzy';
 import {
     FTSOptions,
     FTSTestOptions,
@@ -11,7 +12,7 @@ export class FTS<TKey, TValue extends number> {
     private _marginMultiplier: number;
     private _partitionInterval: number;
     private _partitionCount: number;
-    private _partitionRef: Array<number>;
+    private _partitionRef: Array<FuzzyTriangleGate>;
     private _ruleset: {
         [precedent: number]: Set<number>;
     };
@@ -47,11 +48,13 @@ export class FTS<TKey, TValue extends number> {
             this._partitionCount = options?.partitionCount || 10;
             this._partitionInterval = (this.upperBound - this.lowerBound) / this._partitionCount;
         }
-        this._partitionRef = new Array<number>();
+        this._partitionRef = new Array<FuzzyTriangleGate>();
         this._ruleset = {};
         for (let i = 0; i < this._partitionCount; i++) {
+            const prevPoint = i === 0 ? 0 : (this.lowerBound + (this._partitionInterval * (i - 1)));
             const maxPoint = this.lowerBound + (this._partitionInterval * i);
-            this._partitionRef.push(maxPoint);
+            const nextPoint = this.lowerBound + (this._partitionInterval * (i + 1));
+            this._partitionRef.push(new FuzzyTriangleGate(prevPoint, maxPoint, nextPoint));
             this._ruleset[i] = new Set<number>();
         }
         const _fuzzySet = new Array<number>();
@@ -60,26 +63,29 @@ export class FTS<TKey, TValue extends number> {
         }
     }
 
+    private nearestPartition(value: number) {
+        const degrees = this._partitionRef.map(x => x.degree(value));
+        const highestDegree = Math.max(...degrees);
+        return degrees.findIndex(x => x === highestDegree);
+    }
+
     public train() {
-        const generatedPattern = this._dataset.map(v => {
-            const cap = this._partitionRef.findIndex(x => x > v.value);
-            return (cap === -1 ? this._partitionRef.length : cap) - (cap === 0 ? 0 : 1);
-        });
+        const generatedPattern = this._dataset.map(v => this.nearestPartition(v.value));
         for (let i = 1; i < generatedPattern.length; i++) {
-            this._ruleset[i - 1].add(generatedPattern[i]);
+            const precedent = generatedPattern[i - 1];
+            const consequent = generatedPattern[i];
+            this._ruleset[precedent].add(consequent);
         }
     }
 
     public test(options?: FTSTestOptions<TKey, TValue>) {
         const baseData = options?.dataset || this._dataset;
-        const predicted = baseData.map(v => {
-            const { key, value } = v;
-            const cap = this._partitionRef.findIndex(x => x > value);
-            const partitionIndex = (cap === -1 ? this._partitionRef.length : cap) - (cap === 0 ? 0 : 1);
+        const predicted = baseData.map(({ key, value }) => {
+            const partitionIndex = this.nearestPartition(value);
             const partitionConsequent = (this._ruleset[partitionIndex] || new Set<number>());
             const predictedValue = partitionConsequent.size === 0 ?
-                (this._partitionRef[partitionIndex] + ((this._partitionRef[cap] - this._partitionRef[partitionIndex]) / 2)) :
-                ([...partitionConsequent].map(x => this._partitionRef[x]).reduce((p, c) => p + c, 0) / partitionConsequent.size);
+                (this._partitionRef[partitionIndex].median) :
+                ([...partitionConsequent].map(x => this._partitionRef[x].median).reduce((p, c) => p + c, 0) / partitionConsequent.size);
             return {
                 key,
                 value: options?.viewComparison ? value : predictedValue,
