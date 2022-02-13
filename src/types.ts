@@ -13,5 +13,4 @@ export type FTSOptions = Partial<{
 
 export type FTSTestOptions<TKey, TValue> = Partial<{
     dataset: Array<KeyValuePair<TKey, TValue>>;
-    viewComparison: boolean;
 }>

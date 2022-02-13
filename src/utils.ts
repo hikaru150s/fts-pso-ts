@@ -22,3 +22,7 @@ export function averageForecastingErrorRate(actual: number[], forecast: number[]
     }
     return actual.map((v, i) => Math.abs(v - forecast[i]) / v).reduce((p, c) => p + c, 0) / actual.length;
 }
+
+export type FitFuncDelegate<TResult = any> = (position: number) => TResult;
+export type SelectorFuncDelegate<TResult = any> = (fitResult: TResult[]) => number;
+export type StopCriteria<TResult = any> = (bestResult: TResult) => boolean;

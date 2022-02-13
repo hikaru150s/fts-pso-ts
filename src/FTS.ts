@@ -88,8 +88,8 @@ export class FTS<TKey, TValue extends number> {
                 ([...partitionConsequent].map(x => this._partitionRef[x].median).reduce((p, c) => p + c, 0) / partitionConsequent.size);
             return {
                 key,
-                value: options?.viewComparison ? value : predictedValue,
-                predicted: options?.viewComparison ? predictedValue : undefined,
+                value: value,
+                predicted: predictedValue,
             };
         });
         return predicted;
